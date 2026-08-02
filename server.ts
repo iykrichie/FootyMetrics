@@ -32,7 +32,7 @@ const adminSettings = {
   },
   rightAd: {
     enabled: true,
-    sponsorName: 'FootyMetrics PRO',
+    sponsorName: 'SoccerMatrix AI',
     badge: '🏆 VIP ANALYST PASS',
     title: 'PRO AI Match Radar',
     subtitle: 'Unlock real-time xG arbitrage alerts, line movements, and deep neural match scripts.',
@@ -536,7 +536,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`⚽ FootyMetrics Analytics Platform server listening on http://0.0.0.0:${PORT}`);
+    console.log(`⚽ SoccerMatrix AI Football Intelligence server listening on http://0.0.0.0:${PORT}`);
   });
 }
 

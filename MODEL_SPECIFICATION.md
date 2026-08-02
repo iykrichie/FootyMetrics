@@ -1,6 +1,6 @@
 # 📊 Model Specification: Dixon-Coles & Monte Carlo Probability Engine
 
-This document provides the mathematical model specification for **FootyMetrics PRO ML**.
+This document provides the mathematical model specification for **SoccerMatrix AI**.
 
 ---
 

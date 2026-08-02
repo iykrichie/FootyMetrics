@@ -28,7 +28,7 @@ export const DocsModal: React.FC<DocsModalProps> = ({
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                FootyMetrics PRO Documentation & Developer Reference
+                SoccerMatrix AI Documentation & Developer Reference
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Self-Hosting, Local Development (Windows/Mac/Linux), System Architecture & API
@@ -83,7 +83,7 @@ export const DocsModal: React.FC<DocsModalProps> = ({
               <div className="p-4 bg-emerald-50 dark:bg-slate-800/80 rounded-xl border border-emerald-200 dark:border-slate-700">
                 <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-1">💻 Cross-Platform Local Setup Instructions</h3>
                 <p className="text-slate-600 dark:text-slate-300">
-                  FootyMetrics PRO ML runs natively on Windows (PowerShell / Command Prompt / WSL2), macOS (Intel & Apple Silicon), and Linux distributions.
+                  SoccerMatrix AI runs natively on Windows (PowerShell / Command Prompt / WSL2), macOS (Intel & Apple Silicon), and Linux distributions.
                 </p>
               </div>
 
@@ -91,8 +91,8 @@ export const DocsModal: React.FC<DocsModalProps> = ({
                 {/* Windows Box */}
                 <div className="p-4 bg-slate-900 text-slate-200 rounded-xl border border-slate-800 space-y-2">
                   <span className="text-blue-400 font-bold block text-xs">🪟 Windows PowerShell</span>
-                  <pre className="text-slate-300 whitespace-pre-wrap">{`git clone https://github.com/your-org/footymetrics-pro.git
-cd footymetrics-pro
+                  <pre className="text-slate-300 whitespace-pre-wrap">{`git clone https://github.com/your-org/soccermatrix-ai.git
+cd soccermatrix-ai
 npm install
 Copy-Item .env.example .env
 npm run dev`}</pre>
@@ -102,8 +102,8 @@ npm run dev`}</pre>
                 <div className="p-4 bg-slate-900 text-slate-200 rounded-xl border border-slate-800 space-y-2">
                   <span className="text-emerald-400 font-bold block text-xs">🍎 macOS Terminal</span>
                   <pre className="text-slate-300 whitespace-pre-wrap">{`brew install node
-git clone https://github.com/your-org/footymetrics-pro.git
-cd footymetrics-pro
+git clone https://github.com/your-org/soccermatrix-ai.git
+cd soccermatrix-ai
 npm install
 cp .env.example .env
 npm run dev`}</pre>
@@ -113,8 +113,8 @@ npm run dev`}</pre>
                 <div className="p-4 bg-slate-900 text-slate-200 rounded-xl border border-slate-800 space-y-2">
                   <span className="text-amber-400 font-bold block text-xs">🐧 Linux (Ubuntu / Debian / Arch)</span>
                   <pre className="text-slate-300 whitespace-pre-wrap">{`sudo apt-get install -y nodejs git
-git clone https://github.com/your-org/footymetrics-pro.git
-cd footymetrics-pro
+git clone https://github.com/your-org/soccermatrix-ai.git
+cd soccermatrix-ai
 npm install
 cp .env.example .env
 npm run dev`}</pre>
@@ -152,7 +152,7 @@ npm run dev`}</pre>
 docker-compose up -d --build
 
 # Inspect logs
-docker-compose logs -f footymetrics`}</pre>
+docker-compose logs -f soccermatrix`}</pre>
                 </div>
 
                 <div className="p-4 bg-slate-900 text-slate-200 rounded-xl border border-slate-800 space-y-2">
@@ -160,7 +160,7 @@ docker-compose logs -f footymetrics`}</pre>
                   <pre className="text-slate-300 whitespace-pre-wrap">{`npm ci
 npm run build
 sudo npm install -g pm2
-pm2 start dist/server.cjs --name "footymetrics"
+pm2 start dist/server.cjs --name "soccermatrix-ai"
 pm2 save`}</pre>
                 </div>
               </div>

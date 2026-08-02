@@ -1,6 +1,6 @@
-# ⚽ FootyMetrics PRO ML - Predictive Football Analytics & AI Engine
+# ⚽ SoccerMatrix AI - Advanced Football Intelligence & Predictive Reasoning
 
-FootyMetrics PRO ML is a full-stack, probabilistic football (soccer) match prediction and tactical intelligence application powered by a **Dixon-Coles bivariate Poisson model**, **Monte Carlo (10,000 iteration) simulations**, and **Google Gemini 2.5 Flash AI** for low-cost, token-efficient match analysis.
+SoccerMatrix AI is a full-stack, probabilistic football (soccer) match prediction and tactical intelligence application powered by a **Dixon-Coles bivariate Poisson model**, **Monte Carlo (10,000 iteration) simulations**, and **Google Gemini 3.6 Flash AI** with deep reasoning for low-cost, token-efficient match analysis.
 
 ---
 
@@ -49,8 +49,8 @@ FootyMetrics PRO ML is a full-stack, probabilistic football (soccer) match predi
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-org/footymetrics-pro.git
-cd footymetrics-pro
+git clone https://github.com/your-org/soccermatrix-ai.git
+cd soccermatrix-ai
 
 # 2. Install dependencies
 npm install

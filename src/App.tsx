@@ -35,22 +35,24 @@ export default function App() {
   // User VIP Registration State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isRegisteredUser, setIsRegisteredUser] = useState<boolean>(() => {
-    return localStorage.getItem('footymetrics_vip_user') === 'true';
+    return localStorage.getItem('soccermatrix_vip_user') === 'true' || localStorage.getItem('footymetrics_vip_user') === 'true';
   });
   const [userEmail, setUserEmail] = useState<string | null>(() => {
-    return localStorage.getItem('footymetrics_vip_email');
+    return localStorage.getItem('soccermatrix_vip_email') || localStorage.getItem('footymetrics_vip_email');
   });
 
   const handleRegisterSuccess = (email: string) => {
     setIsRegisteredUser(true);
     setUserEmail(email);
-    localStorage.setItem('footymetrics_vip_user', 'true');
-    localStorage.setItem('footymetrics_vip_email', email);
+    localStorage.setItem('soccermatrix_vip_user', 'true');
+    localStorage.setItem('soccermatrix_vip_email', email);
   };
 
   const handleLogout = () => {
     setIsRegisteredUser(false);
     setUserEmail(null);
+    localStorage.removeItem('soccermatrix_vip_user');
+    localStorage.removeItem('soccermatrix_vip_email');
     localStorage.removeItem('footymetrics_vip_user');
     localStorage.removeItem('footymetrics_vip_email');
   };

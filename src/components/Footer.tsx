@@ -18,11 +18,11 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdmin }) => {
                 ⚽
               </div>
               <span className="font-extrabold text-slate-900 dark:text-white text-base tracking-tight">
-                FootyMetrics <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-xs">PRO</span>
+                SoccerMatrix <span className="text-emerald-600 dark:text-emerald-400 font-extrabold text-xs px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/60 rounded border border-emerald-200 dark:border-emerald-800/50">AI ⚡</span>
               </span>
             </div>
             <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400 max-w-xl">
-              Probabilistic Football Analytics & Match Intelligence Platform covering Top 5 European Leagues.
+              Advanced Football Intelligence & Predictive Analytics Platform covering Top 5 European Leagues.
             </p>
           </div>
 
@@ -46,7 +46,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdmin }) => {
         {/* Bottom Bar */}
         <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-500">
           <div>
-            © 2026 FootyMetrics PRO • All rights reserved. 18+ Play Responsibly.
+            © 2026 SoccerMatrix AI • All rights reserved. 18+ Play Responsibly.
           </div>
 
           <div className="flex items-center gap-4 text-[11px]">
@@ -63,12 +63,6 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdmin }) => {
               <Shield className="w-3.5 h-3.5" />
               <span>Owner Admin Setup</span>
             </a>
-
-            <span className="text-slate-300 dark:text-slate-700">•</span>
-
-            <div className="text-[10px] text-slate-400">
-              Powered by Automated Data Feeds & Cached Optimization Engine
-            </div>
           </div>
         </div>
       </div>

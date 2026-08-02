@@ -216,13 +216,13 @@ services:
   db:
     image: postgres:15-alpine
     environment:
-      POSTGRES_DB: footymetrics
+      POSTGRES_DB: soccermatrix
       POSTGRES_PASSWORD: secretpassword`}</pre>
           </div>
 
           <div className="p-4 bg-slate-900 text-slate-200 rounded-xl border border-slate-800 overflow-x-auto">
             <span className="text-blue-400 font-bold block mb-2"># .github/workflows/deploy.yml</span>
-            <pre className="text-[11px] leading-relaxed text-slate-300">{`name: FootyMetrics CI/CD
+            <pre className="text-[11px] leading-relaxed text-slate-300">{`name: SoccerMatrix AI CI/CD
 on:
   push:
     branches: [ main ]
@@ -237,7 +237,7 @@ jobs:
           npm run lint
           npm run build
       - name: Deploy to Cloud Run
-        run: gcloud run deploy footymetrics`}</pre>
+        run: gcloud run deploy soccermatrix-ai`}</pre>
           </div>
         </div>
       </div>

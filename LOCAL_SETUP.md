@@ -1,6 +1,6 @@
 # 💻 Local Setup & Development Guide (Windows, macOS, Linux)
 
-This guide provides step-by-step instructions to run, build, and develop **FootyMetrics PRO ML** locally on any desktop operating system.
+This guide provides step-by-step instructions to run, build, and develop **SoccerMatrix AI** locally on any desktop operating system.
 
 ---
 
@@ -23,8 +23,8 @@ Ensure you have the following installed on your machine:
 1. Open PowerShell as Administrator (optional, standard terminal works too).
 2. Clone the repository:
    ```powershell
-   git clone https://github.com/your-org/footymetrics-pro.git
-   cd footymetrics-pro
+   git clone https://github.com/your-org/soccermatrix-ai.git
+   cd soccermatrix-ai
    ```
 3. Install dependencies:
    ```powershell
@@ -56,8 +56,8 @@ Ensure you have the following installed on your machine:
    ```
 3. Clone and enter the repository directory:
    ```bash
-   git clone https://github.com/your-org/footymetrics-pro.git
-   cd footymetrics-pro
+   git clone https://github.com/your-org/soccermatrix-ai.git
+   cd soccermatrix-ai
    ```
 4. Install npm dependencies:
    ```bash
@@ -89,8 +89,8 @@ Ensure you have the following installed on your machine:
    ```
 3. Clone the repo and install dependencies:
    ```bash
-   git clone https://github.com/your-org/footymetrics-pro.git
-   cd footymetrics-pro
+   git clone https://github.com/your-org/soccermatrix-ai.git
+   cd soccermatrix-ai
    npm install
    ```
 4. Launch dev server:

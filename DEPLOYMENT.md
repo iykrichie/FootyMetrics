@@ -1,12 +1,12 @@
 # 🐳 Self-Hosting & Production Deployment Guide
 
-This guide covers how to deploy **FootyMetrics PRO ML** to production on Linux servers, Docker containers, Cloud Run, and PM2 process managers.
+This guide covers how to deploy **SoccerMatrix AI** to production on Linux servers, Docker containers, Cloud Run, and PM2 process managers.
 
 ---
 
 ## 🏗 Containerized Deployment (Docker & Docker Compose)
 
-The easiest way to host FootyMetrics PRO ML on a self-hosted Linux VPS (Ubuntu, Debian, CentOS, AlmaLinux) is using Docker.
+The easiest way to host SoccerMatrix AI on a self-hosted Linux VPS (Ubuntu, Debian, CentOS, AlmaLinux) is using Docker.
 
 ### 📄 Dockerfile
 
@@ -54,11 +54,11 @@ CMD ["node", "dist/server.cjs"]
 version: '3.8'
 
 services:
-  footymetrics:
+  soccermatrix:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: footymetrics_app
+    container_name: soccermatrix_app
     restart: always
     ports:
       - "3000:3000"
@@ -79,7 +79,7 @@ To launch with Docker Compose:
 docker-compose up -d --build
 
 # 2. View running container logs
-docker-compose logs -f footymetrics
+docker-compose logs -f soccermatrix
 ```
 
 ---
@@ -95,14 +95,14 @@ sudo npm install -g pm2
 
 ### 2. Build the Application
 ```bash
-cd /var/www/footymetrics-pro
+cd /var/www/soccermatrix-ai
 npm ci
 npm run build
 ```
 
 ### 3. Start Application with PM2
 ```bash
-pm2 start dist/server.cjs --name "footymetrics" --env production
+pm2 start dist/server.cjs --name "soccermatrix-ai" --env production
 pm2 save
 pm2 startup
 ```
@@ -113,12 +113,12 @@ pm2 startup
 
 Configure Nginx to proxy port `80` / `443` to `http://127.0.0.1:3000`:
 
-`/etc/nginx/sites-available/footymetrics`
+`/etc/nginx/sites-available/soccermatrix`
 
 ```nginx
 server {
     listen 80;
-    server_name footymetrics.yourdomain.com;
+    server_name soccermatrix.yourdomain.com;
 
     location / {
         proxy_pass http://127.0.0.1:3000;
@@ -136,12 +136,12 @@ server {
 
 Enable site & SSL via Certbot:
 ```bash
-sudo ln -s /etc/nginx/sites-available/footymetrics /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/soccermatrix /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
 
 # Issue free Let's Encrypt SSL certificate
-sudo certbot --nginx -d footymetrics.yourdomain.com
+sudo certbot --nginx -d soccermatrix.yourdomain.com
 ```
 
 ---
@@ -152,11 +152,11 @@ Deploy directly using Google Cloud SDK:
 
 ```bash
 # Build & submit container image
-gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/footymetrics-app
+gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/soccermatrix-app
 
 # Deploy to Cloud Run
-gcloud run deploy footymetrics-app \
-  --image gcr.io/YOUR_PROJECT_ID/footymetrics-app \
+gcloud run deploy soccermatrix-app \
+  --image gcr.io/YOUR_PROJECT_ID/soccermatrix-app \
   --platform managed \
   --region us-central1 \
   --allow-unauthenticated \
