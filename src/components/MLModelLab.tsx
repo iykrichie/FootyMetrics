@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ModelPerformanceMetrics } from '../types';
+import { MOCK_MODEL_PERFORMANCE } from '../data/mockDatabase';
 import { Cpu, CheckCircle2, Award, Activity, BarChart2, ShieldCheck, RefreshCw } from 'lucide-react';
 import {
   BarChart,
@@ -14,16 +15,23 @@ import {
 } from 'recharts';
 
 export const MLModelLab: React.FC = () => {
-  const [metrics, setMetrics] = useState<ModelPerformanceMetrics | null>(null);
+  const [metrics, setMetrics] = useState<ModelPerformanceMetrics>(MOCK_MODEL_PERFORMANCE);
 
   useEffect(() => {
     fetch('/api/model/metrics')
-      .then((res) => res.json())
-      .then((data) => setMetrics(data))
-      .catch((err) => console.error('Error fetching model metrics:', err));
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (data && data.modelName) {
+          setMetrics(data);
+        }
+      })
+      .catch((err) => {
+        console.warn('Falling back to local ML model metrics:', err);
+      });
   }, []);
-
-  if (!metrics) return null;
 
   return (
     <div className="space-y-6">

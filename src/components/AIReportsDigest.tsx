@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Fixture } from '../types';
-import { Bot, AlertTriangle, ShieldCheck, Sparkles, TrendingUp, ChevronRight } from 'lucide-react';
+import { getFixtures } from '../data/mockDatabase';
+import { Bot, AlertTriangle, ShieldCheck, Sparkles, TrendingUp, ChevronRight, Crown, Lock } from 'lucide-react';
 
 interface AIReportsDigestProps {
   onSelectFixture: (fixture: Fixture) => void;
+  isRegisteredUser?: boolean;
+  onOpenRegistration?: () => void;
 }
 
-export const AIReportsDigest: React.FC<AIReportsDigestProps> = ({ onSelectFixture }) => {
+export const AIReportsDigest: React.FC<AIReportsDigestProps> = ({
+  onSelectFixture,
+  isRegisteredUser = false,
+  onOpenRegistration
+}) => {
   const [digest, setDigest] = useState<{
     highestConfidenceFixtures: Fixture[];
     potentialUpsets: Fixture[];
@@ -16,9 +23,26 @@ export const AIReportsDigest: React.FC<AIReportsDigestProps> = ({ onSelectFixtur
 
   useEffect(() => {
     fetch('/api/reports/digest')
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((data) => setDigest(data))
-      .catch((err) => console.error('Error fetching digest:', err));
+      .catch((err) => {
+        console.warn('Falling back to local report digest:', err);
+        const fixtures = getFixtures();
+        const sortedByConfidence = [...fixtures].sort((a, b) => b.metrics.confidenceScore - a.metrics.confidenceScore);
+        const highestConfidence = sortedByConfidence.slice(0, 3);
+        const potentialUpsets = fixtures.filter((f) => f.metrics.awayWinProb > 35 && f.awayTeam.leaguePosition > f.homeTeam.leaguePosition);
+        const mostBalanced = [...fixtures].sort((a, b) => Math.abs(a.metrics.homeWinProb - a.metrics.awayWinProb) - Math.abs(b.metrics.homeWinProb - b.metrics.awayWinProb)).slice(0, 3);
+
+        setDigest({
+          highestConfidenceFixtures: highestConfidence,
+          potentialUpsets,
+          mostBalancedFixtures: mostBalanced,
+          roundSummaryText: `Analytical models have evaluated ${fixtures.length} upcoming fixtures across the Top 5 European leagues. High-confidence picks demonstrate strong statistical dominance in rolling xG metrics and defensive clean sheet ratios.`
+        });
+      });
   }, []);
 
   if (!digest) return null;
@@ -27,13 +51,32 @@ export const AIReportsDigest: React.FC<AIReportsDigestProps> = ({ onSelectFixtur
     <div className="space-y-6">
       {/* Executive Overview Banner */}
       <div className="p-6 bg-slate-900 dark:bg-slate-900 text-white rounded-2xl shadow-md space-y-3 border border-slate-800 relative overflow-hidden">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-            <Bot className="w-6 h-6" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              <Bot className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-xl font-heading font-extrabold tracking-tight text-white">AI Executive Match Intelligence Digest</h2>
+              <p className="text-xs text-emerald-400 font-semibold tracking-wide">Automated Round Analysis & Statistical Outlier Engine</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-xl font-heading font-extrabold tracking-tight text-white">AI Executive Match Intelligence Digest</h2>
-            <p className="text-xs text-emerald-400 font-semibold tracking-wide">Automated Round Analysis & Statistical Outlier Engine</p>
+
+          <div className="flex items-center gap-2">
+            {!isRegisteredUser ? (
+              <button
+                onClick={onOpenRegistration}
+                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow transition"
+              >
+                <Crown className="w-3.5 h-3.5 fill-slate-950" />
+                <span>Unlock VIP Reports</span>
+              </button>
+            ) : (
+              <span className="px-3 py-1 bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 rounded-full text-xs font-bold flex items-center gap-1">
+                <Crown className="w-3.5 h-3.5 fill-emerald-400" />
+                <span>VIP Member Active</span>
+              </span>
+            )}
           </div>
         </div>
 

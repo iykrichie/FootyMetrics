@@ -1,6 +1,6 @@
 import React from 'react';
 import { League, LeagueId } from '../types';
-import { Activity, BarChart3, Bot, ChevronRight, Cpu, Layers, RefreshCw, ShieldAlert, Sparkles, Sun, Moon, Trophy } from 'lucide-react';
+import { Activity, BarChart3, Bot, ChevronRight, Cpu, Layers, RefreshCw, Shield, Sparkles, Sun, Moon, Trophy, Crown, Lock } from 'lucide-react';
 
 interface HeaderProps {
   leagues: League[];
@@ -14,6 +14,10 @@ interface HeaderProps {
   isRefreshing: boolean;
   darkMode: boolean;
   onToggleDarkMode: () => void;
+  onOpenAdmin?: () => void;
+  isRegisteredUser?: boolean;
+  userEmail?: string | null;
+  onOpenRegistration?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -27,7 +31,11 @@ export const Header: React.FC<HeaderProps> = ({
   onRefreshData,
   isRefreshing,
   darkMode,
-  onToggleDarkMode
+  onToggleDarkMode,
+  onOpenAdmin,
+  isRegisteredUser = false,
+  userEmail,
+  onOpenRegistration
 }) => {
   const tabs = [
     { id: 'fixtures', label: 'Predictions Summary', icon: BarChart3 },
@@ -49,12 +57,12 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-                  FootyMetrics <span className="text-emerald-600 dark:text-emerald-400 font-medium text-sm px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/50 rounded-full">PRO ML</span>
+                <h1 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                  <span>SoccerMatrix</span> <span className="text-emerald-600 dark:text-emerald-400 font-extrabold text-sm px-2.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/50 rounded-full">AI ⚡</span>
                 </h1>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Top 5 European Leagues Match Analytics & Dixon-Coles Probabilistic Engine
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                Advanced Football Intelligence Powered by Deep AI Reasoning & Predictive Analytics
               </p>
             </div>
           </div>
@@ -96,6 +104,20 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 ${isRefreshing ? 'animate-spin' : ''}`} />
               <span className="text-xs">{isRefreshing ? 'Ingesting...' : 'Sync Data'}</span>
+            </button>
+
+            {/* VIP Status / Registration Button */}
+            <button
+              onClick={onOpenRegistration}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg transition shadow-sm min-h-[36px] ${
+                isRegisteredUser
+                  ? 'bg-emerald-600 text-white hover:bg-emerald-500'
+                  : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+              }`}
+              title={isRegisteredUser ? 'VIP Account Active' : 'Register for VIP Access & Explainable AI Reports'}
+            >
+              <Crown className={`w-3.5 h-3.5 ${isRegisteredUser ? 'fill-white' : 'fill-slate-950'}`} />
+              <span>{isRegisteredUser ? 'VIP Active 👑' : 'VIP Access'}</span>
             </button>
 
             {/* Dark Mode Toggle */}

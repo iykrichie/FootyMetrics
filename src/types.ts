@@ -264,3 +264,40 @@ export interface SystemJobLog {
   executionTimeMs: number;
   nextScheduledRun: string;
 }
+
+export interface AdBannerSlot {
+  enabled: boolean;
+  title: string;
+  subtitle: string;
+  ctaText: string;
+  ctaUrl: string;
+  badge: string;
+  imageUrl?: string;
+  sponsorName: string;
+  clicks: number;
+  impressions: number;
+}
+
+export interface SiteAdminSettings {
+  leftAd: AdBannerSlot;
+  rightAd: AdBannerSlot;
+  mobileAd: AdBannerSlot;
+  cacheTtlMinutes: number;
+  aiModelPreference: string;
+  maintenanceMode: boolean;
+  announcementText: string;
+  autoSyncEnabled: boolean;
+}
+
+export interface CacheOptimizationStats {
+  totalRequests: number;
+  geminiHits: number;
+  geminiMisses: number;
+  liveSyncHits: number;
+  liveSyncMisses: number;
+  cachedFixturesCount: number;
+  cachedAiReportsCount: number;
+  totalCostSavedUsd: number;
+  lastSyncTimestamp: string;
+}
+

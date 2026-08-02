@@ -259,10 +259,16 @@ export const MatchPredictionsSummary: React.FC<MatchPredictionsSummaryProps> = (
                     <span className="text-[10px] text-slate-400 uppercase font-bold truncate max-w-[100px]">{fixture.venue.split(',')[0]}</span>
                   </div>
 
-                  <div className="flex items-center justify-between font-bold text-slate-900 dark:text-white text-sm">
-                    <span>{fixture.homeTeam.name}</span>
-                    <span className="text-xs text-slate-400 font-normal">vs</span>
-                    <span>{fixture.awayTeam.name}</span>
+                  <div className="flex items-center justify-between font-bold text-slate-900 dark:text-white text-sm pt-1">
+                    <div className="flex items-center gap-2">
+                      <TeamLogo logo={fixture.homeTeam.logo} name={fixture.homeTeam.name} className="w-5 h-5" />
+                      <span className="truncate max-w-[100px]">{fixture.homeTeam.shortName || fixture.homeTeam.name}</span>
+                    </div>
+                    <span className="text-xs text-slate-400 font-normal px-1">vs</span>
+                    <div className="flex items-center gap-2">
+                      <span className="truncate max-w-[100px] text-right">{fixture.awayTeam.shortName || fixture.awayTeam.name}</span>
+                      <TeamLogo logo={fixture.awayTeam.logo} name={fixture.awayTeam.name} className="w-5 h-5" />
+                    </div>
                   </div>
 
                   <div className="p-2.5 rounded-lg bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/30 text-xs text-emerald-900 dark:text-emerald-300 space-y-1">

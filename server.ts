@@ -17,13 +17,65 @@ app.use(express.json());
 let allFixturesCache: Fixture[] = getFixtures();
 const aiReportsCache: Record<string, AIMatchAnalysisReport> = {};
 
+// Site Owner Admin Settings & Caching/Cost Reduction Stats
+const adminSettings = {
+  leftAd: {
+    enabled: true,
+    sponsorName: 'Bet365 Sportsbook',
+    badge: '🔥 200% MATCH BONUS',
+    title: 'Premier Sportsbook Partner',
+    subtitle: 'Bet $10 on top matches & get $200 instant bonus credits with live boosted odds.',
+    ctaText: 'Claim $200 Bonus',
+    ctaUrl: 'https://www.bet365.com',
+    clicks: 142,
+    impressions: 3890
+  },
+  rightAd: {
+    enabled: true,
+    sponsorName: 'FootyMetrics PRO',
+    badge: '🏆 VIP ANALYST PASS',
+    title: 'PRO AI Match Radar',
+    subtitle: 'Unlock real-time xG arbitrage alerts, line movements, and deep neural match scripts.',
+    ctaText: 'Upgrade to PRO',
+    ctaUrl: 'https://ai.studio/build',
+    clicks: 98,
+    impressions: 3410
+  },
+  mobileAd: {
+    enabled: true,
+    sponsorName: 'Premier Odds Boost',
+    badge: '⚡ 3.5x ODDS BOOST',
+    title: 'Weekend Parlay Booster',
+    subtitle: 'Boost your weekend accumulator payouts by up to 350%.',
+    ctaText: 'Boost My Odds',
+    ctaUrl: 'https://www.flashscore.com',
+    clicks: 45,
+    impressions: 1200
+  },
+  cacheTtlMinutes: 30,
+  aiModelPreference: 'gemini-3.6-flash',
+  maintenanceMode: false,
+  announcementText: '⚡ Live Premier League & European Data Feeds Active. Gemini AI Cost & Rate Optimization Enabled.',
+  autoSyncEnabled: true
+};
+
+const cacheStats = {
+  totalRequests: 0,
+  geminiHits: 0,
+  geminiMisses: 0,
+  liveSyncHits: 0,
+  liveSyncMisses: 0,
+  lastSyncTimestamp: new Date().toISOString()
+};
+
 // Background sync for real live fixtures
 async function syncLiveFixtures() {
   try {
     const live = await fetchLiveEspnFixtures();
     if (live && live.length > 0) {
-      // Merge live real matches with default analytical model matches
       allFixturesCache = live;
+      cacheStats.lastSyncTimestamp = new Date().toISOString();
+      cacheStats.liveSyncMisses += 1;
       console.log(`⚽ Successfully synced ${live.length} real live fixtures from ESPN / Flashscore data feed.`);
     }
   } catch (err) {
@@ -147,8 +199,12 @@ app.post('/api/analyze/:id', async (req, res) => {
 
   // Return cached report if available
   if (aiReportsCache[fixtureId]) {
+    cacheStats.geminiHits += 1;
+    cacheStats.totalRequests += 1;
     return res.json(aiReportsCache[fixtureId]);
   }
+  cacheStats.geminiMisses += 1;
+  cacheStats.totalRequests += 1;
 
   const client = getGeminiClient();
 
@@ -208,7 +264,7 @@ Provide a JSON object response matching this exact schema:
         model: 'gemini-3.6-flash',
         contents: prompt,
         config: {
-          maxOutputTokens: 1000,
+          maxOutputTokens: 2500,
           temperature: 0.2,
           responseMimeType: 'application/json',
           responseSchema: {
@@ -263,7 +319,11 @@ Provide a JSON object response matching this exact schema:
       });
 
       if (response.text) {
-        const parsedData = JSON.parse(response.text.trim());
+        let cleanText = response.text.trim();
+        if (cleanText.startsWith('```')) {
+          cleanText = cleanText.replace(/^```(json)?\s*/i, '').replace(/\s*```$/, '').trim();
+        }
+        const parsedData = JSON.parse(cleanText);
         const fullReport: AIMatchAnalysisReport = {
           fixtureId,
           generatedAt: new Date().toISOString(),
@@ -348,6 +408,63 @@ app.get('/api/model/metrics', (req, res) => {
 // Data Engineering Job Logs
 app.get('/api/jobs/status', (req, res) => {
   res.json(MOCK_SYSTEM_JOBS);
+});
+
+// --- SITE OWNER ADMIN & COST OPTIMIZATION API ROUTES ---
+
+// Get Site Settings & Optimization Stats
+app.get('/api/admin/settings', (req, res) => {
+  res.json({
+    settings: adminSettings,
+    stats: {
+      ...cacheStats,
+      cachedFixturesCount: allFixturesCache.length,
+      cachedAiReportsCount: Object.keys(aiReportsCache).length,
+      totalCostSavedUsd: Number((cacheStats.geminiHits * 0.03 + cacheStats.liveSyncHits * 0.005).toFixed(2))
+    },
+    cachedReports: Object.values(aiReportsCache)
+  });
+});
+
+// Update Site Settings
+app.post('/api/admin/settings', (req, res) => {
+  const newSettings = req.body;
+  if (newSettings) {
+    if (newSettings.leftAd) adminSettings.leftAd = { ...adminSettings.leftAd, ...newSettings.leftAd };
+    if (newSettings.rightAd) adminSettings.rightAd = { ...adminSettings.rightAd, ...newSettings.rightAd };
+    if (newSettings.mobileAd) adminSettings.mobileAd = { ...adminSettings.mobileAd, ...newSettings.mobileAd };
+    if (typeof newSettings.cacheTtlMinutes === 'number') adminSettings.cacheTtlMinutes = newSettings.cacheTtlMinutes;
+    if (newSettings.aiModelPreference) adminSettings.aiModelPreference = newSettings.aiModelPreference;
+    if (typeof newSettings.maintenanceMode === 'boolean') adminSettings.maintenanceMode = newSettings.maintenanceMode;
+    if (typeof newSettings.announcementText === 'string') adminSettings.announcementText = newSettings.announcementText;
+    if (typeof newSettings.autoSyncEnabled === 'boolean') adminSettings.autoSyncEnabled = newSettings.autoSyncEnabled;
+  }
+  res.json({ success: true, settings: adminSettings });
+});
+
+// Track Ad Click
+app.post('/api/admin/ad-click', (req, res) => {
+  const { position } = req.body || {};
+  if (position === 'left' && adminSettings.leftAd) {
+    adminSettings.leftAd.clicks += 1;
+  } else if (position === 'right' && adminSettings.rightAd) {
+    adminSettings.rightAd.clicks += 1;
+  } else if (position === 'mobile' && adminSettings.mobileAd) {
+    adminSettings.mobileAd.clicks += 1;
+  }
+  res.json({ success: true, leftClicks: adminSettings.leftAd.clicks, rightClicks: adminSettings.rightAd.clicks });
+});
+
+// Clear Cache
+app.post('/api/admin/clear-cache', (req, res) => {
+  const { target } = req.body || {};
+  if (target === 'ai' || target === 'all') {
+    Object.keys(aiReportsCache).forEach((k) => delete aiReportsCache[k]);
+  }
+  if (target === 'fixtures' || target === 'all') {
+    allFixturesCache = getFixtures();
+  }
+  res.json({ success: true, message: `Cleared cache for target: ${target}` });
 });
 
 // Trigger Real Live Data Refresh from ESPN / Flashscore API

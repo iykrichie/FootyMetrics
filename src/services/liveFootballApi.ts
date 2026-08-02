@@ -120,8 +120,14 @@ export async function fetchLiveEspnFixtures(): Promise<Fixture[]> {
 
   for (const code of espnCodes) {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+
       const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${code}/scoreboard`;
-      const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      const response = await fetch(url, {
+        headers: { 'Accept': 'application/json' },
+        signal: controller.signal
+      }).finally(() => clearTimeout(timeoutId));
 
       if (!response.ok) continue;
 

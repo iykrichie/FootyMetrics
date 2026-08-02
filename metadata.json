@@ -1,6 +1,6 @@
 {
-  "name": "FootyMetrics - Football Match Analytics & ML Prediction Platform",
-  "description": "Production-grade football analytics platform for Top 5 European leagues with ML outcome probabilities, team ratings, xG metrics, and explainable AI match reports.",
+  "name": "SoccerMatrix AI - Advanced Football Intelligence & Predictive Reasoning",
+  "description": "SoccerMatrix AI is a football analytics & prediction engine combining machine learning match outcome probabilities, Dixon-Coles xG models, and Gemini 3.6 Flash explainable AI reasoning.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
