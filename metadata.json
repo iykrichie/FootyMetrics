@@ -1,0 +1,6 @@
+{
+  "name": "FootyMetrics - Football Match Analytics & ML Prediction Platform",
+  "description": "Production-grade football analytics platform for Top 5 European leagues with ML outcome probabilities, team ratings, xG metrics, and explainable AI match reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
