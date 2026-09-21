@@ -8,22 +8,28 @@ import { TeamComparisonView } from './components/TeamComparisonView';
 import { AIReportsDigest } from './components/AIReportsDigest';
 import { MLModelLab } from './components/MLModelLab';
 import { ArchitectureDocs } from './components/ArchitectureDocs';
+import { PredictionHistoryView } from './components/PredictionHistoryView';
 import { Footer } from './components/Footer';
 import { DocsModal } from './components/DocsModal';
 import { VerticalAdBanner } from './components/VerticalAdBanner';
 import { AdminPanelModal } from './components/AdminPanelModal';
 import { UserAuthModal } from './components/UserAuthModal';
-import { LEAGUES, TEAMS, getFixtures } from './data/mockDatabase';
-import { Megaphone, ExternalLink, ShieldAlert } from 'lucide-react';
+import { LEAGUES, TEAMS } from './data/mockDatabase';
+import { parseDateString, getWeeklyForecastRanges } from './utils/dateUtils';
+import { Megaphone, ExternalLink, ShieldAlert, ShieldCheck } from 'lucide-react';
 
 export default function App() {
   const [leagues, setLeagues] = useState<League[]>(LEAGUES);
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>('all');
   const [selectedWeekend, setSelectedWeekend] = useState<number>(1);
+  const [selectedHorizon, setSelectedHorizon] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<string>('fixtures');
   
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [teams, setTeams] = useState<Team[]>(Object.values(TEAMS));
+  const [isFixtureDataUnavailable, setIsFixtureDataUnavailable] = useState<boolean>(false);
+  const [fixtureDataErrorMessage, setFixtureDataErrorMessage] = useState<string | null>(null);
+  const [verificationStats, setVerificationStats] = useState<{ totalVerified: number; source: string; leaguesCount: number } | null>(null);
   
   const [selectedFixtureForModal, setSelectedFixtureForModal] = useState<Fixture | null>(null);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -96,35 +102,95 @@ export default function App() {
     }).catch(() => {});
   };
 
-  // Load Fixtures when league or weekend changes
+  // Check verification status of the data pipeline
+  const checkVerificationStatus = () => {
+    fetch('/api/fixtures/verification-status')
+      .then((res) => res.json())
+      .then((status) => {
+        setVerificationStats({
+          totalVerified: status.totalVerifiedFixtures || 0,
+          source: status.source || 'ESPN Scoreboard API',
+          leaguesCount: status.leaguesCount || 7
+        });
+        if (status.isFixtureDataUnavailable) {
+          setIsFixtureDataUnavailable(true);
+        }
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    checkVerificationStatus();
+
+    // Auto-detect active slate with verified matches
+    fetch('/api/fixtures')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((allVerified: Fixture[]) => {
+        if (Array.isArray(allVerified) && allVerified.length > 0) {
+          const weeklyRanges = getWeeklyForecastRanges();
+          const w1Count = allVerified.filter((f) => f.kickoffDate >= weeklyRanges[1].startDate && f.kickoffDate <= weeklyRanges[1].endDate).length;
+          const w2Count = allVerified.filter((f) => f.kickoffDate >= weeklyRanges[2].startDate && f.kickoffDate <= weeklyRanges[2].endDate).length;
+          const w3Count = allVerified.filter((f) => f.kickoffDate >= weeklyRanges[3].startDate && f.kickoffDate <= weeklyRanges[3].endDate).length;
+
+          if (w1Count === 0) {
+            if (w2Count > 0) {
+              setSelectedWeekend(2);
+            } else if (w3Count > 0) {
+              setSelectedWeekend(3);
+            }
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Load Fixtures strictly from verified football data pipeline
   const loadFixtures = () => {
     let url = `/api/fixtures?weekend=${selectedWeekend}`;
     if (selectedLeagueId !== 'all') {
       url += `&leagueId=${selectedLeagueId}`;
     }
+    if (selectedHorizon && selectedHorizon !== 'all') {
+      url += `&horizon=${selectedHorizon}`;
+    }
+
+    const weeklyRanges = getWeeklyForecastRanges();
+    const currentWeekRange = weeklyRanges[selectedWeekend as 1 | 2 | 3] || weeklyRanges[1];
 
     fetch(url)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP error ${res.status}`);
         return res.json();
       })
-      .then((data: Fixture[]) => setFixtures(data))
+      .then((data: any) => {
+        if (data && data.error === 'FIXTURE_DATA_UNAVAILABLE') {
+          setIsFixtureDataUnavailable(true);
+          setFixtureDataErrorMessage(data.message || 'Verified fixture data is currently unavailable.');
+          setFixtures([]);
+          return;
+        }
+
+        const list: Fixture[] = Array.isArray(data) ? data : (data.fixtures || []);
+        setIsFixtureDataUnavailable(false);
+        setFixtureDataErrorMessage(null);
+
+        // Enforce strict Monday (D0) to Sunday (D7) date boundary for the active weekly cycle
+        const strictlyBounded = list
+          .filter((f) => f.kickoffDate >= currentWeekRange.startDate && f.kickoffDate <= currentWeekRange.endDate)
+          .sort((a, b) => a.kickoffDate.localeCompare(b.kickoffDate) || a.kickoffTime.localeCompare(b.kickoffTime));
+        setFixtures(strictlyBounded);
+      })
       .catch((err) => {
-        console.warn('Backend API unavailable, using local analytical engine:', err);
-        let all = getFixtures();
-        if (selectedLeagueId !== 'all') {
-          all = all.filter((f) => f.leagueId === selectedLeagueId);
-        }
-        if ([1, 2, 3].includes(selectedWeekend)) {
-          all = all.filter((f) => f.weekendNumber === selectedWeekend);
-        }
-        setFixtures(all);
+        console.warn('Verified fixture service communication failed:', err);
+        setIsFixtureDataUnavailable(true);
+        setFixtureDataErrorMessage('Unable to reach verified football data source. Under strict data integrity rules, no fixtures are fabricated or inferred.');
+        setFixtures([]);
       });
   };
 
   useEffect(() => {
     loadFixtures();
-  }, [selectedLeagueId, selectedWeekend]);
+  }, [selectedLeagueId, selectedWeekend, selectedHorizon]);
 
   // Trigger Data Refresh pipeline
   const handleRefreshData = () => {
@@ -133,6 +199,7 @@ export default function App() {
       .then((res) => res.json())
       .then(() => {
         loadFixtures();
+        checkVerificationStatus();
         setIsRefreshing(false);
       })
       .catch((err) => {
@@ -172,6 +239,8 @@ export default function App() {
         onSelectLeague={setSelectedLeagueId}
         selectedWeekend={selectedWeekend}
         onSelectWeekend={setSelectedWeekend}
+        selectedHorizon={selectedHorizon}
+        onSelectHorizon={setSelectedHorizon}
         activeTab={activeTab}
         onSelectTab={setActiveTab}
         onRefreshData={handleRefreshData}
@@ -222,6 +291,30 @@ export default function App() {
             </div>
           )}
 
+          {/* Strict Data Integrity Alert Banner if Source Feed is Unavailable */}
+          {isFixtureDataUnavailable && (
+            <div className="mb-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 text-amber-900 dark:text-amber-200 flex items-start sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-start sm:items-center gap-3 min-w-0">
+                <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
+                <div className="text-xs">
+                  <span className="font-extrabold block sm:inline mr-1 text-amber-800 dark:text-amber-300">
+                    Strict Verified Data Policy Active:
+                  </span>
+                  <span>
+                    {fixtureDataErrorMessage || 'Official fixture feed unavailable. Under strict data integrity rules, no match fixtures are fabricated or inferred.'}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={handleRefreshData}
+                disabled={isRefreshing}
+                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-xl whitespace-nowrap shrink-0 transition disabled:opacity-50"
+              >
+                {isRefreshing ? 'Verifying...' : 'Retry Verify'}
+              </button>
+            </div>
+          )}
+
           {/* TAB 1: MATCH PREDICTIONS SUMMARY */}
           {activeTab === 'fixtures' && (
             <MatchPredictionsSummary
@@ -230,6 +323,20 @@ export default function App() {
               selectedLeagueId={selectedLeagueId}
               onSelectLeague={setSelectedLeagueId}
               onOpenAnalysis={setSelectedFixtureForModal}
+              onNavigateToHistory={() => setActiveTab('history')}
+              selectedHorizon={selectedHorizon}
+              onSelectHorizon={setSelectedHorizon}
+              isDataUnavailable={isFixtureDataUnavailable}
+              onRetrySync={handleRefreshData}
+              onSelectWeekend={setSelectedWeekend}
+            />
+          )}
+
+          {/* TAB 1.5: PREDICTION WIN / LOSS HISTORY TRACKER */}
+          {activeTab === 'history' && (
+            <PredictionHistoryView
+              fixtures={fixtures}
+              leagues={leagues}
             />
           )}
 

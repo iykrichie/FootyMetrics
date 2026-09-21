@@ -1,4 +1,4 @@
-export type LeagueId = 'epl' | 'laliga' | 'bundesliga' | 'seriea' | 'ligue1';
+export type LeagueId = 'epl' | 'laliga' | 'bundesliga' | 'seriea' | 'ligue1' | 'eredivisie' | 'ligaportugal';
 
 export interface League {
   id: LeagueId;
@@ -193,6 +193,22 @@ export interface MatchMetrics {
   detailedMarkets?: DetailedMarketPredictions;
 }
 
+export interface FixtureVerification {
+  isVerified: boolean;
+  source: string; // e.g. "Official ESPN Scoreboard API"
+  sourceEventId: string; // e.g. "700778"
+  sourceUrl: string; // "https://www.espn.com/soccer/match/_/id/700778"
+  verifiedAt: string;
+  sourceAttribution: string;
+  verifiedFields: {
+    competition: boolean;
+    teams: boolean;
+    kickoffDate: boolean;
+    kickoffTime: boolean;
+    matchStatus: boolean;
+  };
+}
+
 export interface Fixture {
   id: string;
   leagueId: LeagueId;
@@ -201,6 +217,9 @@ export interface Fixture {
   kickoffTime: string;
   venue: string;
   referee: string;
+  round?: string;
+  isOfficialFixture?: boolean;
+  source?: string;
   
   homeTeamId: string;
   awayTeamId: string;
@@ -216,6 +235,9 @@ export interface Fixture {
     homeGoals: number;
     awayGoals: number;
   };
+
+  // Explicit verification integrity metadata
+  verification?: FixtureVerification;
 }
 
 export interface KeyMatchup {
@@ -299,5 +321,102 @@ export interface CacheOptimizationStats {
   cachedAiReportsCount: number;
   totalCostSavedUsd: number;
   lastSyncTimestamp: string;
+}
+
+// --- WIN & LOSS PREDICTION HISTORY TRACKING TYPES ---
+
+export type PredictionOutcome = 'WON' | 'LOST' | 'VOID' | 'PENDING';
+
+export type PredictionMarketType = 
+  | '1X2' 
+  | 'OVER_UNDER_2_5' 
+  | 'OVER_UNDER_1_5' 
+  | 'OVER_UNDER_3_5' 
+  | 'BTTS' 
+  | 'DOUBLE_CHANCE' 
+  | 'VALUE_PLAY';
+
+export interface PredictionHistoryRecord {
+  id: string;
+  fixtureId?: string;
+  date: string; // ISO format or YYYY-MM-DD
+  matchName: string; // e.g. "Arsenal vs Chelsea"
+  homeTeam: string;
+  awayTeam: string;
+  homeTeamLogo?: string;
+  awayTeamLogo?: string;
+  leagueId: LeagueId;
+  leagueName: string;
+
+  // Prediction specification
+  marketType: PredictionMarketType;
+  marketLabel: string; // e.g. "1X2 Match Winner", "Over 2.5 Goals", "Both Teams to Score"
+  selection: string; // e.g. "Arsenal Win", "Over 2.5", "Yes (Both Teams to Score)", "Arsenal or Draw (1X)"
+  predictedProbability: number; // 0 - 100%
+  fairOdds: number; // Model fair price e.g. 1.48
+  closingOdds: number; // Bookmaker / closing market price e.g. 1.70
+  confidenceLevel: 'Very High' | 'High' | 'Medium' | 'Low';
+  stakeUnits: number; // e.g. 1.0
+
+  // Result & Settlement
+  actualHomeGoals?: number;
+  actualAwayGoals?: number;
+  actualScore?: string; // e.g. "3 - 1"
+  status: PredictionOutcome;
+  profitUnits: number; // +0.70 for 1.70 odds win on 1u stake, -1.00 for loss, 0 for void
+  payoutUnits: number; // 1.70 for win, 0 for loss, 1.00 for void
+
+  // Analytical Post-Match Notes
+  analysisNote: string;
+  isModelPick: boolean;
+  loggedAt: string;
+}
+
+export interface PredictionPerformanceSummary {
+  totalPredictions: number;
+  settledPredictions: number;
+  wonCount: number;
+  lostCount: number;
+  voidCount: number;
+  pendingCount: number;
+  strikeRate: number; // Win % e.g. 71.4
+  totalUnitsStaked: number;
+  netProfitUnits: number;
+  roiPercentage: number; // e.g. +14.2%
+  longestWinStreak: number;
+  currentStreak: { type: 'W' | 'L' | 'NONE'; count: number };
+  averageOdds: number;
+
+  // Market Breakdown
+  marketBreakdown: {
+    marketType: PredictionMarketType;
+    marketLabel: string;
+    total: number;
+    won: number;
+    lost: number;
+    strikeRate: number;
+    profitUnits: number;
+    roi: number;
+  }[];
+
+  // League Breakdown
+  leagueBreakdown: {
+    leagueId: LeagueId;
+    leagueName: string;
+    total: number;
+    won: number;
+    lost: number;
+    strikeRate: number;
+    profitUnits: number;
+  }[];
+
+  // Cumulative P&L Timeline
+  timelineTrends: {
+    date: string;
+    cumulativeProfit: number;
+    strikeRate: number;
+    won: number;
+    lost: number;
+  }[];
 }
 

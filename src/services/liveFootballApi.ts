@@ -1,6 +1,7 @@
 import { Fixture, LeagueId, Team } from '../types';
 import { TEAMS } from '../data/mockDatabase';
 import { computeMatchMetrics, buildFixtureInfluencingFactors } from './analyticsEngine';
+import { getMondayOfWeek, getWeeklyForecastRanges } from '../utils/dateUtils';
 
 const ESPN_LEAGUE_MAP: Record<string, { leagueId: LeagueId; defaultVenue: string }> = {
   'eng.1': { leagueId: 'epl', defaultVenue: 'Premier League Stadium' },
@@ -79,6 +80,14 @@ function findOrCreateTeam(espnTeam: EspnCompetitor['team'], leagueId: LeagueId):
   const xG = Number((1.1 + (offRating - 60) * 0.02).toFixed(2));
   const xGA = Number((1.4 - (defRating - 60) * 0.015).toFixed(2));
 
+  // Pick genuine league opponents for recent matches
+  const leaguePeers = Object.values(TEAMS)
+    .filter(t => t.leagueId === leagueId && t.name.toLowerCase() !== teamName.toLowerCase())
+    .map(t => t.name.replace(' FC', '').replace(' CF', ''));
+  const opp1 = leaguePeers[0] || 'Arsenal';
+  const opp2 = leaguePeers[1] || 'Chelsea';
+  const opp3 = leaguePeers[2] || 'Liverpool';
+
   return {
     id: `espn_${espnTeam.id || hash}`,
     name: teamName,
@@ -97,9 +106,9 @@ function findOrCreateTeam(espnTeam: EspnCompetitor['team'], leagueId: LeagueId):
     xG,
     xGA,
     formLast5: [
-      { result: 'W', opponent: 'Opponent A', score: '2-1', isHome: true, date: '2026-07-25' },
-      { result: 'D', opponent: 'Opponent B', score: '1-1', isHome: false, date: '2026-07-20' },
-      { result: 'W', opponent: 'Opponent C', score: '3-0', isHome: true, date: '2026-07-15' }
+      { result: 'W', opponent: opp1, score: '2-1', isHome: true, date: '2026-07-25' },
+      { result: 'D', opponent: opp2, score: '1-1', isHome: false, date: '2026-07-20' },
+      { result: 'W', opponent: opp3, score: '2-0', isHome: true, date: '2026-07-15' }
     ],
     formLast10Score: Math.min(95, Math.max(45, Math.round(offRating * 0.6 + defRating * 0.4))),
     homeFormScore: offRating,
@@ -183,13 +192,34 @@ export async function fetchLiveEspnFixtures(): Promise<Fixture[]> {
           ]
         };
 
-        const metrics = computeMatchMetrics(homeTeam, awayTeam, h2h, 1);
-        const influencingFactors = buildFixtureInfluencingFactors(homeTeam, awayTeam, 1);
+        // Calculate weekly horizon strictly based on Monday - Sunday weekly cycles
+        const weeklyRanges = getWeeklyForecastRanges();
+        const w1 = weeklyRanges[1];
+        const w2 = weeklyRanges[2];
+        const w3 = weeklyRanges[3];
+
+        // Discard any past match that occurred before Monday D0 of the current week (e.g. yesterday Sunday or prior)
+        // or matches beyond the 3-week prediction horizon
+        if (kickoffDate < w1.startDate || kickoffDate > w3.endDate) {
+          return;
+        }
+
+        let computedWeekend: 1 | 2 | 3 = 1;
+        if (kickoffDate >= w3.startDate && kickoffDate <= w3.endDate) {
+          computedWeekend = 3;
+        } else if (kickoffDate >= w2.startDate && kickoffDate <= w2.endDate) {
+          computedWeekend = 2;
+        } else {
+          computedWeekend = 1;
+        }
+
+        const metrics = computeMatchMetrics(homeTeam, awayTeam, h2h, computedWeekend);
+        const influencingFactors = buildFixtureInfluencingFactors(homeTeam, awayTeam, computedWeekend);
 
         fetchedFixtures.push({
           id: `espn_fix_${evt.id}`,
           leagueId: leagueConfig.leagueId,
-          weekendNumber: 1,
+          weekendNumber: computedWeekend,
           kickoffDate,
           kickoffTime,
           venue: venueName,

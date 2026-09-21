@@ -3,19 +3,31 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 
-import { LEAGUES, TEAMS, getFixtures, MOCK_MODEL_PERFORMANCE, MOCK_SYSTEM_JOBS } from './src/data/mockDatabase.ts';
-import { fetchLiveEspnFixtures } from './src/services/liveFootballApi.ts';
+import { LEAGUES, TEAMS, MOCK_MODEL_PERFORMANCE, MOCK_SYSTEM_JOBS } from './src/data/mockDatabase.ts';
+import { fetchAllVerifiedTop7Fixtures, TOP_7_VERIFIED_LEAGUES } from './src/services/verifiedFixtureService.ts';
 import { computeMatchMetrics } from './src/services/analyticsEngine.ts';
-import { AIMatchAnalysisReport, Fixture, League, Team } from './src/types.ts';
+import { AIMatchAnalysisReport, Fixture, League, PredictionHistoryRecord, Team } from './src/types.ts';
+import { getRelativeDateStr, getMondayOfWeek, parseDateString, getWeeklyForecastRanges } from './src/utils/dateUtils.ts';
+import { 
+  DEFAULT_PREDICTION_HISTORY, 
+  computePerformanceSummary, 
+  evaluatePredictionOutcome, 
+  calculateProfitUnits 
+} from './src/data/predictionHistoryData.ts';
 
 const app = express();
 const PORT = 3000;
 
 app.use(express.json());
 
-// In-memory cache for dynamic fixture updates & generated AI reports
-let allFixturesCache: Fixture[] = getFixtures();
+// In-memory cache for verified fixture data & generated AI reports
+// STRICT POLICY: Only independently verified fixtures from official data feeds are stored.
+// AI models and internal fallbacks are strictly prohibited from creating fixture records.
+let allFixturesCache: Fixture[] = [];
+let isFixtureDataUnavailable: boolean = false;
+let lastSyncError: string | null = null;
 const aiReportsCache: Record<string, AIMatchAnalysisReport> = {};
+let predictionHistoryCache: PredictionHistoryRecord[] = [...DEFAULT_PREDICTION_HISTORY];
 
 // Site Owner Admin Settings & Caching/Cost Reduction Stats
 const adminSettings = {
@@ -68,21 +80,36 @@ const cacheStats = {
   lastSyncTimestamp: new Date().toISOString()
 };
 
-// Background sync for real live fixtures
+// Background sync for verified fixtures from official football data feeds (Top 7 leagues)
+let initialSyncPromise: Promise<void> | null = null;
 async function syncLiveFixtures() {
   try {
-    const live = await fetchLiveEspnFixtures();
-    if (live && live.length > 0) {
-      allFixturesCache = live;
+    console.log('🔄 [Verified Fixture Pipeline] Syncing verified match fixtures across Top 7 leagues from ESPN API...');
+    const verified = await fetchAllVerifiedTop7Fixtures();
+
+    if (verified && verified.length > 0) {
+      allFixturesCache = verified;
+      isFixtureDataUnavailable = false;
+      lastSyncError = null;
       cacheStats.lastSyncTimestamp = new Date().toISOString();
-      cacheStats.liveSyncMisses += 1;
-      console.log(`⚽ Successfully synced ${live.length} real live fixtures from ESPN / Flashscore data feed.`);
+      cacheStats.liveSyncHits += 1;
+      console.log(`🛡️ [Verified Fixture Pipeline] Active verified fixtures: ${verified.length} matches across all 7 leagues.`);
+    } else {
+      if (allFixturesCache.length === 0) {
+        isFixtureDataUnavailable = true;
+        lastSyncError = 'No verified match fixtures returned by official feed.';
+        console.warn('⚠️ [Verified Fixture Pipeline] Verified feed returned 0 matches. Strict policy prohibits falling back to fabricated data.');
+      }
     }
-  } catch (err) {
-    console.warn('Live fixture sync error, preserving base fixtures:', err);
+  } catch (err: any) {
+    console.error('❌ [Verified Fixture Pipeline] Sync error:', err);
+    if (allFixturesCache.length === 0) {
+      isFixtureDataUnavailable = true;
+      lastSyncError = err?.message || 'Failed to reach verified football data source';
+    }
   }
 }
-syncLiveFixtures();
+initialSyncPromise = syncLiveFixtures();
 
 // Helper to get Gemini client
 let aiClient: GoogleGenAI | null = null;
@@ -118,22 +145,98 @@ app.get('/api/leagues', (req, res) => {
   res.json(LEAGUES);
 });
 
-// Get Fixtures (with optional filtering)
-app.get('/api/fixtures', (req, res) => {
+// Get Fixtures (with weekly horizon, date range, or present day / D+7 filtering)
+app.get('/api/fixtures', async (req, res) => {
+  if (allFixturesCache.length === 0 && initialSyncPromise) {
+    try {
+      await initialSyncPromise;
+    } catch (_) {}
+  }
+
   const leagueId = req.query.leagueId as string | undefined;
   const weekend = req.query.weekend ? parseInt(req.query.weekend as string, 10) : undefined;
+  const horizon = req.query.horizon as string | undefined; // 'today' | 'monday' | 'sunday' | 'all'
+  const date = req.query.date as string | undefined; // YYYY-MM-DD
+  const startDate = req.query.startDate as string | undefined;
+  const endDate = req.query.endDate as string | undefined;
+  const dayOffset = req.query.dayOffset !== undefined ? parseInt(req.query.dayOffset as string, 10) : undefined;
 
-  let result = [...allFixturesCache];
+  const weeklyRanges = getWeeklyForecastRanges();
+  const currentWeekMonday = weeklyRanges[1].startDate;
+
+  // Never return past fixtures from yesterday or older
+  let result = allFixturesCache.filter((f) => f.kickoffDate >= currentWeekMonday);
 
   if (leagueId && leagueId !== 'all') {
     result = result.filter((f) => f.leagueId === leagueId);
   }
 
+  // Filter by weekly horizon block (1 = Current Week, 2 = Week +1, 3 = Week +2)
+  // Each week is strictly bounded from its Monday to Sunday (e.g. 21 - 27 September)
   if (weekend && [1, 2, 3].includes(weekend)) {
-    result = result.filter((f) => f.weekendNumber === weekend);
+    const range = weeklyRanges[weekend as 1 | 2 | 3];
+    if (range) {
+      result = result.filter((f) => f.kickoffDate >= range.startDate && f.kickoffDate <= range.endDate);
+    } else {
+      result = result.filter((f) => f.weekendNumber === weekend);
+    }
   }
 
+  // Filter by specific day offset (e.g. 0 for today)
+  if (dayOffset !== undefined && !isNaN(dayOffset)) {
+    const targetDate = getRelativeDateStr(dayOffset);
+    result = result.filter((f) => f.kickoffDate === targetDate);
+  }
+
+  // Filter by specific date
+  if (date) {
+    result = result.filter((f) => f.kickoffDate === date);
+  }
+
+  // Filter by date range (startDate to endDate)
+  if (startDate && endDate) {
+    result = result.filter((f) => f.kickoffDate >= startDate && f.kickoffDate <= endDate);
+  }
+
+  // Filter by named horizon (Monday D0, Sunday D7, Today, or rolling)
+  const activeRange = (weekend && [1, 2, 3].includes(weekend)) ? weeklyRanges[weekend as 1 | 2 | 3] : weeklyRanges[1];
+  if (horizon === 'monday' || horizon === 'd0') {
+    result = result.filter((f) => f.kickoffDate === activeRange.startDate);
+  } else if (horizon === 'sunday' || horizon === 'd7' || horizon === 'd7_exact') {
+    result = result.filter((f) => f.kickoffDate === activeRange.endDate);
+  } else if (horizon === 'today') {
+    const todayStr = getRelativeDateStr(0);
+    result = result.filter((f) => f.kickoffDate === todayStr);
+  } else if (horizon === 'week') {
+    result = result.filter((f) => f.kickoffDate >= activeRange.startDate && f.kickoffDate <= activeRange.endDate);
+  }
+
+  // Always sort chronologically: from Monday (D0) up to Sunday (D7)
+  result.sort((a, b) => a.kickoffDate.localeCompare(b.kickoffDate) || a.kickoffTime.localeCompare(b.kickoffTime));
+
   res.json(result);
+});
+
+// Verification Integrity Status Endpoint (MUST BE BEFORE :id route)
+app.get('/api/fixtures/verification-status', (req, res) => {
+  const verifiedCount = allFixturesCache.filter(f => f.verification?.isVerified).length;
+  const leagueCounts: Record<string, number> = {};
+  allFixturesCache.forEach(f => {
+    leagueCounts[f.leagueId] = (leagueCounts[f.leagueId] || 0) + 1;
+  });
+
+  res.json({
+    verifiedFixturesPolicy: 'STRICT_OFFICIAL_ONLY',
+    aiFabricationBlocked: true,
+    totalVerifiedFixtures: verifiedCount,
+    allFixturesTracedToSource: verifiedCount === allFixturesCache.length,
+    isDataUnavailable: isFixtureDataUnavailable && allFixturesCache.length === 0,
+    primarySource: 'Official ESPN Scoreboard API',
+    top7LeaguesSupported: Object.keys(TOP_7_VERIFIED_LEAGUES),
+    leagueBreakdown: leagueCounts,
+    lastSyncTimestamp: cacheStats.lastSyncTimestamp,
+    lastSyncError
+  });
 });
 
 // Get Single Fixture
@@ -189,12 +292,25 @@ app.get('/api/compare', (req, res) => {
 });
 
 // Generate or Retrieve AI Analytical Match Report via Gemini
+// STRICT DATA INTEGRITY: Reports are ONLY generated for fixtures that exist in the verified dataset.
+// AI is strictly prohibited from creating or hallucinating match fixtures.
 app.post('/api/analyze/:id', async (req, res) => {
   const fixtureId = req.params.id;
   const fixture = allFixturesCache.find((f) => f.id === fixtureId);
 
   if (!fixture) {
-    return res.status(404).json({ error: 'Fixture not found' });
+    return res.status(404).json({ 
+      error: 'FIXTURE_NOT_VERIFIED',
+      message: 'Match fixture not found in verified dataset. Under strict data integrity rules, AI models cannot create fixture records or analyze unverified matches.' 
+    });
+  }
+
+  // Ensure fixture has valid verification metadata
+  if (fixture.verification && !fixture.verification.isVerified) {
+    return res.status(400).json({
+      error: 'FIXTURE_VERIFICATION_FAILED',
+      message: 'Match fixture has not passed independent data source verification.'
+    });
   }
 
   // Return cached report if available
@@ -383,9 +499,20 @@ Provide a JSON object response matching this exact schema:
   return res.json(fallbackReport);
 });
 
-// AI Round Digest (Executive summary of predictions across fixtures)
+// AI Round Digest (Executive summary of predictions strictly across verified fixtures)
 app.get('/api/reports/digest', (req, res) => {
   const fixtures = allFixturesCache;
+
+  if (fixtures.length === 0) {
+    return res.json({
+      highestConfidenceFixtures: [],
+      potentialUpsets: [],
+      mostBalancedFixtures: [],
+      isDataUnavailable: isFixtureDataUnavailable,
+      roundSummaryText: 'Verified fixture data is currently unavailable. Statistical digest is paused until official football data feeds are verified.'
+    });
+  }
+
   const sortedByConfidence = [...fixtures].sort((a, b) => b.metrics.confidenceScore - a.metrics.confidenceScore);
   const highestConfidence = sortedByConfidence.slice(0, 3);
 
@@ -396,7 +523,8 @@ app.get('/api/reports/digest', (req, res) => {
     highestConfidenceFixtures: highestConfidence,
     potentialUpsets,
     mostBalancedFixtures: mostBalanced,
-    roundSummaryText: `Analytical models have evaluated ${fixtures.length} upcoming fixtures across the Top 5 European leagues. High-confidence picks demonstrate strong statistical dominance in rolling xG metrics and defensive clean sheet ratios.`
+    isDataUnavailable: false,
+    roundSummaryText: `Analytical models have evaluated ${fixtures.length} verified upcoming fixtures across the Top 7 European leagues (Premier League, La Liga, Bundesliga, Serie A, Ligue 1, Eredivisie, Liga Portugal). High-confidence picks demonstrate strong statistical dominance in rolling xG metrics and defensive clean sheet ratios.`
   });
 });
 
@@ -408,6 +536,156 @@ app.get('/api/model/metrics', (req, res) => {
 // Data Engineering Job Logs
 app.get('/api/jobs/status', (req, res) => {
   res.json(MOCK_SYSTEM_JOBS);
+});
+
+// --- WIN & LOSS PREDICTION HISTORY API ROUTES ---
+
+// Get all prediction history records and performance metrics
+app.get('/api/predictions/history', (req, res) => {
+  const { leagueId, status, marketType } = req.query as {
+    leagueId?: string;
+    status?: string;
+    marketType?: string;
+  };
+
+  let filtered = [...predictionHistoryCache];
+
+  if (leagueId && leagueId !== 'all') {
+    filtered = filtered.filter((r) => r.leagueId === leagueId);
+  }
+  if (status && status !== 'all') {
+    filtered = filtered.filter((r) => r.status === status);
+  }
+  if (marketType && marketType !== 'all') {
+    filtered = filtered.filter((r) => r.marketType === marketType);
+  }
+
+  const summary = computePerformanceSummary(predictionHistoryCache);
+
+  res.json({
+    records: filtered,
+    totalCount: filtered.length,
+    summary
+  });
+});
+
+// Log a new prediction (settled or pending)
+app.post('/api/predictions/history', (req, res) => {
+  try {
+    const body = req.body;
+    if (!body || !body.matchName || !body.marketType || !body.selection) {
+      return res.status(400).json({ error: 'Missing required prediction fields (matchName, marketType, selection)' });
+    }
+
+    const homeGoals = typeof body.actualHomeGoals === 'number' ? body.actualHomeGoals : undefined;
+    const awayGoals = typeof body.actualAwayGoals === 'number' ? body.actualAwayGoals : undefined;
+    const isSettled = homeGoals !== undefined && awayGoals !== undefined;
+
+    let status = body.status || 'PENDING';
+    let profitUnits = 0;
+    let payoutUnits = 0;
+
+    if (isSettled) {
+      status = evaluatePredictionOutcome(body.marketType, body.selection, homeGoals, awayGoals);
+      const profitCalc = calculateProfitUnits(status, Number(body.closingOdds) || 1.80, Number(body.stakeUnits) || 1.0);
+      profitUnits = profitCalc.profitUnits;
+      payoutUnits = profitCalc.payoutUnits;
+    }
+
+    const newRecord: PredictionHistoryRecord = {
+      id: body.id || `pred-user-${Date.now()}`,
+      fixtureId: body.fixtureId,
+      date: body.date || new Date().toISOString().split('T')[0],
+      matchName: body.matchName,
+      homeTeam: body.homeTeam || body.matchName.split(' vs ')[0] || 'Home Team',
+      awayTeam: body.awayTeam || body.matchName.split(' vs ')[1] || 'Away Team',
+      homeTeamLogo: body.homeTeamLogo || '⚽',
+      awayTeamLogo: body.awayTeamLogo || '🛡️',
+      leagueId: body.leagueId || 'epl',
+      leagueName: body.leagueName || 'Premier League',
+      marketType: body.marketType,
+      marketLabel: body.marketLabel || body.marketType,
+      selection: body.selection,
+      predictedProbability: Number(body.predictedProbability) || 65,
+      fairOdds: Number(body.fairOdds) || 1.55,
+      closingOdds: Number(body.closingOdds) || 1.80,
+      confidenceLevel: body.confidenceLevel || 'High',
+      stakeUnits: Number(body.stakeUnits) || 1.0,
+      actualHomeGoals: homeGoals,
+      actualAwayGoals: awayGoals,
+      actualScore: isSettled ? `${homeGoals} - ${awayGoals}` : undefined,
+      status,
+      profitUnits,
+      payoutUnits,
+      analysisNote: body.analysisNote || 'Logged via user prediction tracker.',
+      isModelPick: body.isModelPick ?? false,
+      loggedAt: new Date().toISOString()
+    };
+
+    predictionHistoryCache.unshift(newRecord);
+    const summary = computePerformanceSummary(predictionHistoryCache);
+
+    res.json({
+      success: true,
+      record: newRecord,
+      summary
+    });
+  } catch (err: any) {
+    console.error('Error saving prediction record:', err);
+    res.status(500).json({ error: err.message || 'Internal error' });
+  }
+});
+
+// Settle an existing prediction with final score
+app.put('/api/predictions/history/:id/settle', (req, res) => {
+  const { id } = req.params;
+  const { homeGoals, awayGoals, actualScore, analysisNote } = req.body;
+
+  const index = predictionHistoryCache.findIndex((r) => r.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Prediction record not found' });
+  }
+
+  const record = predictionHistoryCache[index];
+  const hG = Number(homeGoals) || 0;
+  const aG = Number(awayGoals) || 0;
+  const outcome = evaluatePredictionOutcome(record.marketType, record.selection, hG, aG);
+  const { profitUnits, payoutUnits } = calculateProfitUnits(outcome, record.closingOdds, record.stakeUnits);
+
+  const updated: PredictionHistoryRecord = {
+    ...record,
+    actualHomeGoals: hG,
+    actualAwayGoals: aG,
+    actualScore: actualScore || `${hG} - ${aG}`,
+    status: outcome,
+    profitUnits,
+    payoutUnits,
+    analysisNote: analysisNote || record.analysisNote || `Settled ${hG}-${aG}. Outcome: ${outcome}`
+  };
+
+  predictionHistoryCache[index] = updated;
+  const summary = computePerformanceSummary(predictionHistoryCache);
+
+  res.json({
+    success: true,
+    record: updated,
+    summary
+  });
+});
+
+// Delete prediction record
+app.delete('/api/predictions/history/:id', (req, res) => {
+  const { id } = req.params;
+  predictionHistoryCache = predictionHistoryCache.filter((r) => r.id !== id);
+  const summary = computePerformanceSummary(predictionHistoryCache);
+  res.json({ success: true, summary });
+});
+
+// Reset prediction history to default benchmark dataset
+app.post('/api/predictions/history/reset', (req, res) => {
+  predictionHistoryCache = [...DEFAULT_PREDICTION_HISTORY];
+  const summary = computePerformanceSummary(predictionHistoryCache);
+  res.json({ success: true, summary, records: predictionHistoryCache });
 });
 
 // --- SITE OWNER ADMIN & COST OPTIMIZATION API ROUTES ---
@@ -456,52 +734,66 @@ app.post('/api/admin/ad-click', (req, res) => {
 });
 
 // Clear Cache
-app.post('/api/admin/clear-cache', (req, res) => {
+app.post('/api/admin/clear-cache', async (req, res) => {
   const { target } = req.body || {};
   if (target === 'ai' || target === 'all') {
     Object.keys(aiReportsCache).forEach((k) => delete aiReportsCache[k]);
   }
   if (target === 'fixtures' || target === 'all') {
-    allFixturesCache = getFixtures();
+    allFixturesCache = [];
+    await syncLiveFixtures();
   }
-  res.json({ success: true, message: `Cleared cache for target: ${target}` });
+  res.json({ 
+    success: true, 
+    message: `Cleared cache for target: ${target}`,
+    activeVerifiedFixturesCount: allFixturesCache.length 
+  });
 });
 
-// Trigger Real Live Data Refresh from ESPN / Flashscore API
+// Machine Learning Model Diagnostics & Performance Metrics
+
+// Trigger Real Live Data Refresh from Official ESPN Feed across Top 7 leagues
 app.post('/api/fixtures/sync-live', async (req, res) => {
   try {
-    const liveMatches = await fetchLiveEspnFixtures();
-    if (liveMatches && liveMatches.length > 0) {
-      allFixturesCache = liveMatches;
+    const verifiedMatches = await fetchAllVerifiedTop7Fixtures();
+    if (verifiedMatches && verifiedMatches.length > 0) {
+      allFixturesCache = verifiedMatches;
+      isFixtureDataUnavailable = false;
+      lastSyncError = null;
       return res.json({
         success: true,
-        source: 'Official Live ESPN / Flashscore Match Feed',
-        syncedCount: liveMatches.length,
+        source: 'Official ESPN Scoreboard Feed (Top 7 Leagues)',
+        syncedCount: verifiedMatches.length,
         timestamp: new Date().toISOString()
       });
     } else {
+      if (allFixturesCache.length === 0) {
+        isFixtureDataUnavailable = true;
+        lastSyncError = 'No verified match fixtures returned by official feed.';
+      }
       return res.json({
         success: false,
-        message: 'No live matches found currently on remote feed, keeping cached schedule.',
-        syncedCount: allFixturesCache.length
+        message: 'No verified matches returned from official feed. Fixture fabrication is prohibited.',
+        syncedCount: allFixturesCache.length,
+        isDataUnavailable: isFixtureDataUnavailable
       });
     }
   } catch (err: any) {
-    res.status(500).json({ error: 'Failed to sync live fixtures', details: err?.message });
+    res.status(500).json({ error: 'Failed to sync verified fixtures', details: err?.message });
   }
 });
 
-// Trigger Data Refresh (Simulate pipeline update)
+// Trigger Data Refresh (Official Verified Pipeline)
 app.post('/api/jobs/trigger-refresh', async (req, res) => {
   try {
-    const liveMatches = await fetchLiveEspnFixtures();
-    if (liveMatches && liveMatches.length > 0) {
-      allFixturesCache = liveMatches;
-    } else {
-      allFixturesCache = getFixtures();
+    const verifiedMatches = await fetchAllVerifiedTop7Fixtures();
+    if (verifiedMatches && verifiedMatches.length > 0) {
+      allFixturesCache = verifiedMatches;
+      isFixtureDataUnavailable = false;
+      lastSyncError = null;
     }
-  } catch (e) {
-    allFixturesCache = getFixtures();
+  } catch (e: any) {
+    console.error('Trigger refresh error:', e);
   }
 
   const now = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
@@ -512,8 +804,9 @@ app.post('/api/jobs/trigger-refresh', async (req, res) => {
 
   res.json({
     success: true,
-    message: 'Data ingestion and ML inference jobs triggered successfully.',
+    message: 'Verified fixtures synchronized across Top 7 European leagues. Predictions generated strictly from verified match records.',
     updatedFixturesCount: allFixturesCache.length,
+    isDataUnavailable: isFixtureDataUnavailable && allFixturesCache.length === 0,
     timestamp: now
   });
 });

@@ -3,6 +3,7 @@ import { Fixture } from '../types';
 import { LEAGUES } from '../data/mockDatabase';
 import { Calendar, MapPin, Sparkles, Award, ShieldCheck, ChevronRight } from 'lucide-react';
 import { TeamLogo } from './TeamLogo';
+import { formatRelativeDateLabel } from '../utils/dateUtils';
 
 interface FixtureCardProps {
   fixture: Fixture;
@@ -12,6 +13,7 @@ interface FixtureCardProps {
 export const FixtureCard: React.FC<FixtureCardProps> = ({ fixture, onOpenAnalysis }) => {
   const league = LEAGUES.find((l) => l.id === fixture.leagueId);
   const { metrics } = fixture;
+  const relativeDate = formatRelativeDateLabel(fixture.kickoffDate);
 
   const formatKickoffDateTime = (dateStr: string, timeStr: string) => {
     if (!dateStr) return timeStr || '';
@@ -31,10 +33,50 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({ fixture, onOpenAnalysi
     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm hover:shadow-lg transition-all duration-200 overflow-hidden flex flex-col justify-between group">
       
       {/* 1. Header Bar */}
-      <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 text-xs">
-        <div className="flex items-center gap-2">
+      <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 text-xs flex-wrap sm:flex-nowrap">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-base">{league?.flag}</span>
           <span className="font-bold text-slate-800 dark:text-slate-200">{league?.name}</span>
+
+          {fixture.round && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+              {fixture.round}
+            </span>
+          )}
+
+          {fixture.verification?.isVerified ? (
+            <span 
+              className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100/70 dark:bg-emerald-950/70 px-1.5 py-0.5 rounded border border-emerald-300/60 dark:border-emerald-800/50 flex items-center gap-1 cursor-help"
+              title={`Independently Verified by ${fixture.verification.source}\nEvent ID: ${fixture.verification.sourceEventId}\nVerified at: ${fixture.verification.verifiedAt}\nCompetition: Verified ✓ | Teams: Verified ✓ | Kickoff: Verified ✓`}
+            >
+              <ShieldCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+              <span>Verified #{fixture.verification.sourceEventId.slice(-6)}</span>
+            </span>
+          ) : fixture.isOfficialFixture ? (
+            <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100/70 dark:bg-emerald-950/70 px-1.5 py-0.5 rounded border border-emerald-300/60 dark:border-emerald-800/50 flex items-center gap-0.5">
+              <ShieldCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+              Verified
+            </span>
+          ) : null}
+
+          {/* Horizon Day Tag */}
+          {relativeDate.isToday ? (
+            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/40">
+              ⚡ TODAY • MON D0
+            </span>
+          ) : relativeDate.isMonday ? (
+            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/40">
+              MONDAY • D0
+            </span>
+          ) : relativeDate.isD7 ? (
+            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-500/40">
+              🎯 SUNDAY • D7
+            </span>
+          ) : (
+            <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+              {relativeDate.dayBadge}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

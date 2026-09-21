@@ -92,9 +92,11 @@ Define fundamental domain models:
 - `PredictionResult`: Home/Draw/Away probabilities, xG projection, Dixon-Coles parameters ($\lambda, \mu$), score matrix, value bets, Monte Carlo distribution.
 - `MatchReport`: AI-generated tactical overview, key matchups, and probabilistic summary.
 
-### Step 2.2: Mock Database & Historical Feeds (`src/data/mockDatabase.ts`)
+### Step 2.2: Mock Database & Historical Feeds (`src/data/mockDatabase.ts`, `src/utils/dateUtils.ts`)
+- **Rolling Weekly Horizons**: Calendar and offset math calculating relative days (`D0` / Present Day through `D+7`, `D+8..D+14`, `D+15..D+21`).
+- **D+7 Horizon Filters**: Filter matches dynamically by Present Day (`today`), D+7 (`d7_exact`), full 8-day rolling window (`d7`), or individual calendar offsets (`day_0`..`day_7`).
 - Populate Top 5 league team rosters with calibrated attack strength $\alpha$, defense rating $\beta$, and expected goals xG averages.
-- Generate fixture lists across 3 matchweek forecast horizons (Current Week, Week +1, Week +2).
+- Generate fixture lists across 3 rolling weekly horizons (Current Week, Week +1, Week +2) with real-world dates matching current schedules.
 
 ### Step 2.3: Dixon-Coles & Monte Carlo Analytics Engine (`src/services/analyticsEngine.ts`)
 1. **Dixon-Coles Poisson Correction Factor**:
@@ -179,6 +181,14 @@ Configure font imports (Outfit, Plus Jakarta Sans) and responsive custom scrollb
 
 ### Step 5.7: AI Tactical Digest (`src/components/AIReportsDigest.tsx`)
 - Aggregated collection of AI-generated weekend match briefs and tactical insights.
+
+### Step 5.8: Prediction Win/Loss History Ledger (`src/components/PredictionHistoryView.tsx`, `src/data/predictionHistoryData.ts`)
+- **Historical Settled Ledger**: Tracks past match predictions against final scores across Top 5 leagues.
+- **Audit & Performance KPI Tracking**: Calculates live strike rate (% win rate), total units staked, net profit/loss, ROI yield, and active winning streaks.
+- **Visual Analytics**: Interactive cumulative P&L growth area chart and market-specific strike rate breakdowns (1X2, Over/Under 2.5, BTTS, Double Chance).
+- **Interactive Prediction Logging**: Form allowing users to log new predictions or auto-populate upcoming matches, with automated win/loss evaluation.
+- **Match Settlement & CSV Export**: Tools to enter actual full-time match scores to settle outcomes, plus one-click CSV export and benchmark resets.
+- **API Endpoints**: `GET /api/predictions/history`, `POST /api/predictions/history`, `PUT /api/predictions/history/:id/settle`, `DELETE /api/predictions/history/:id`, `POST /api/predictions/history/reset`.
 
 ---
 
