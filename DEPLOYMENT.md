@@ -6,42 +6,44 @@ This guide covers how to deploy **SoccerMatrix AI** to production on Linux serve
 
 ## 🏗 Containerized Deployment (Docker & Docker Compose)
 
-The easiest way to host SoccerMatrix AI on a self-hosted Linux VPS (Ubuntu, Debian, CentOS, AlmaLinux) is using Docker.
+The repository includes a production-ready, multi-stage `Dockerfile` and `docker-compose.yml` for self-hosted Linux VPS (Ubuntu, Debian, CentOS, AlmaLinux, AWS EC2, DigitalOcean, Hetzner) and local Docker testing.
 
 ### 📄 Dockerfile
 
-A production-ready multi-stage `Dockerfile`:
+The multi-stage Alpine build ensures minimal container footprint (~180MB) and hardened non-root execution:
 
 ```dockerfile
-# Step 1: Build stage
+# Stage 1: Build & Bundle
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy dependency locks
 COPY package*.json ./
-RUN npm ci
+RUN npm ci || npm install
 
-# Copy source files
 COPY . .
 
-# Build Vite frontend & Bundle Express server to dist/server.cjs
 RUN npm run build
 
-# Step 2: Production runtime stage
+# Stage 2: Production runtime stage
 FROM node:20-alpine AS runner
 
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Copy compiled build output & production dependencies
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm install --omit=dev --ignore-scripts
 
 COPY --from=builder /app/dist ./dist
 
+# Non-root user for security
+USER node
+
 EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://localhost:3000/api/health || exit 1
 
 CMD ["node", "dist/server.cjs"]
 ```
@@ -59,27 +61,35 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: soccermatrix_app
-    restart: always
+    restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    env_file:
+      - path: .env
+        required: false
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 10s
 ```
 
 To launch with Docker Compose:
 ```bash
 # 1. Start the container in detached mode
-docker-compose up -d --build
+docker compose up -d --build
 
 # 2. View running container logs
-docker-compose logs -f soccermatrix
+docker compose logs -f soccermatrix
+
+# 3. Verify health & API readiness
+curl -s http://localhost:3000/api/health
+curl -s http://localhost:3000/api/fixtures/verification-status
 ```
 
 ---

@@ -45,30 +45,88 @@ SoccerMatrix AI is a full-stack, probabilistic football (soccer) match predictio
 
 ---
 
-## ⚡ Quick Start (Local Development)
+## ⚡ Quick Start: Running Locally with Docker
+
+The fastest way to test and run SoccerMatrix AI on your laptop without managing local Node.js or dependency environments is with **Docker Desktop**:
+
+### 1. Launch with Docker Compose (Recommended)
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/your-org/soccermatrix-ai.git
 cd soccermatrix-ai
 
-# 2. Install dependencies
+# 2. Configure environment (optional, for Gemini AI match reports)
+cp .env.example .env
+# Edit .env and set GEMINI_API_KEY if desired
+
+# 3. Build & start the container
+docker compose up --build -d
+
+# 4. Follow live server logs
+docker compose logs -f
+```
+
+Open **`http://localhost:3000`** in your browser.
+
+### 2. Standalone Docker CLI (Alternative)
+
+```bash
+# Build the Docker image
+docker build -t soccermatrix-ai:latest .
+
+# Run container on port 3000
+docker run -d --name soccermatrix_app -p 3000:3000 --env-file .env soccermatrix-ai:latest
+
+# Check container logs
+docker logs -f soccermatrix_app
+```
+
+### 3. Verify & Test Your Local Docker Instance
+
+Once the container is running, verify everything is working properly via terminal or browser:
+
+```bash
+# Test server health endpoint
+curl -s http://localhost:3000/api/health
+# Expected: {"status":"ok","timestamp":"..."}
+
+# Verify real football data integrity (Top 7 European leagues)
+curl -s http://localhost:3000/api/fixtures/verification-status
+# Expected: {"verifiedFixturesPolicy":"STRICT_OFFICIAL_ONLY","aiFabricationBlocked":true,"totalVerifiedFixtures":74,...}
+
+# Query upcoming match predictions
+curl -s "http://localhost:3000/api/fixtures?weekend=3"
+```
+
+To stop the container:
+```bash
+docker compose down
+# Or if using standalone container:
+docker stop soccermatrix_app && docker rm soccermatrix_app
+```
+
+---
+
+## 💻 Alternative: Running with Local Node.js
+
+```bash
+# 1. Install dependencies
 npm install
 
-# 3. Configure environment variables (optional for AI reports)
+# 2. Configure environment variables (optional)
 cp .env.example .env
-# Edit .env and add your GEMINI_API_KEY if desired
 
-# 4. Start the development server
+# 3. Start development server
 npm run dev
 ```
 
-Open `http://localhost:3000` in your browser.
+Navigate to `http://localhost:3000`.
 
 ---
 
 ## 📖 Further Documentation
 
-- 💻 **[LOCAL_SETUP.md](./LOCAL_SETUP.md)** - Detailed guide for setup on **Windows**, **macOS**, and **Linux**.
+- 💻 **[LOCAL_SETUP.md](./LOCAL_SETUP.md)** - Comprehensive guide for local laptop execution via **Docker Desktop** (Windows WSL2, macOS Intel/Apple Silicon, Linux) and native Node.js, including detailed testing procedures and troubleshooting.
 - 🐳 **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Production hosting with **Docker**, **Nginx**, **Cloud Run**, and **PM2**.
 - 📊 **[MODEL_SPECIFICATION.md](./MODEL_SPECIFICATION.md)** - Mathematical documentation of Dixon-Coles model & Poisson distribution formulas.

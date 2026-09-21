@@ -81,29 +81,52 @@ export const DocsModal: React.FC<DocsModalProps> = ({
           {activeSubTab === 'local' && (
             <div className="space-y-6 text-xs leading-relaxed text-slate-700 dark:text-slate-300">
               <div className="p-4 bg-emerald-50 dark:bg-slate-800/80 rounded-xl border border-emerald-200 dark:border-slate-700">
-                <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-1">💻 Cross-Platform Local Setup Instructions</h3>
+                <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-1">💻 Run Locally on a Laptop with Docker Desktop</h3>
                 <p className="text-slate-600 dark:text-slate-300">
-                  SoccerMatrix AI runs natively on Windows (PowerShell / Command Prompt / WSL2), macOS (Intel & Apple Silicon), and Linux distributions.
+                  The recommended and cleanest method to test SoccerMatrix AI on your laptop (macOS Intel/Apple Silicon, Windows WSL2, or Linux) is with Docker:
                 </p>
               </div>
 
+              {/* Docker One-Liner Box */}
+              <div className="p-4 bg-slate-900 text-slate-200 rounded-xl border border-slate-800 space-y-2">
+                <span className="text-emerald-400 font-bold block text-xs">🐳 1-Command Docker Compose Launch</span>
+                <pre className="text-slate-300 whitespace-pre-wrap">{`git clone https://github.com/your-org/soccermatrix-ai.git
+cd soccermatrix-ai
+cp .env.example .env
+docker compose up --build -d
+docker compose logs -f`}</pre>
+                <p className="text-[11px] text-slate-400 pt-1">
+                  Access the app at <span className="text-emerald-400 font-mono">http://localhost:3000</span>.
+                </p>
+              </div>
+
+              {/* Local Verification Tests */}
+              <div className="p-4 bg-slate-900 text-slate-200 rounded-xl border border-slate-800 space-y-2">
+                <span className="text-blue-400 font-bold block text-xs">🧪 Verify Local Docker Instance (Terminal Tests)</span>
+                <pre className="text-slate-300 whitespace-pre-wrap">{`# Test 1: Check server health
+curl -s http://localhost:3000/api/health
+
+# Test 2: Check verified football data pipeline status (Top 7 leagues)
+curl -s http://localhost:3000/api/fixtures/verification-status
+
+# Test 3: Query active verified fixture slate
+curl -s "http://localhost:3000/api/fixtures?weekend=3"`}</pre>
+              </div>
+
+              {/* Native OS Setup Grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-[11px]">
                 {/* Windows Box */}
                 <div className="p-4 bg-slate-900 text-slate-200 rounded-xl border border-slate-800 space-y-2">
-                  <span className="text-blue-400 font-bold block text-xs">🪟 Windows PowerShell</span>
-                  <pre className="text-slate-300 whitespace-pre-wrap">{`git clone https://github.com/your-org/soccermatrix-ai.git
-cd soccermatrix-ai
-npm install
+                  <span className="text-blue-400 font-bold block text-xs">🪟 Native Windows (Node)</span>
+                  <pre className="text-slate-300 whitespace-pre-wrap">{`npm install
 Copy-Item .env.example .env
 npm run dev`}</pre>
                 </div>
 
                 {/* macOS Box */}
                 <div className="p-4 bg-slate-900 text-slate-200 rounded-xl border border-slate-800 space-y-2">
-                  <span className="text-emerald-400 font-bold block text-xs">🍎 macOS Terminal</span>
+                  <span className="text-emerald-400 font-bold block text-xs">🍎 Native macOS (Node)</span>
                   <pre className="text-slate-300 whitespace-pre-wrap">{`brew install node
-git clone https://github.com/your-org/soccermatrix-ai.git
-cd soccermatrix-ai
 npm install
 cp .env.example .env
 npm run dev`}</pre>
@@ -111,11 +134,8 @@ npm run dev`}</pre>
 
                 {/* Linux Box */}
                 <div className="p-4 bg-slate-900 text-slate-200 rounded-xl border border-slate-800 space-y-2">
-                  <span className="text-amber-400 font-bold block text-xs">🐧 Linux (Ubuntu / Debian / Arch)</span>
-                  <pre className="text-slate-300 whitespace-pre-wrap">{`sudo apt-get install -y nodejs git
-git clone https://github.com/your-org/soccermatrix-ai.git
-cd soccermatrix-ai
-npm install
+                  <span className="text-amber-400 font-bold block text-xs">🐧 Native Linux (Node)</span>
+                  <pre className="text-slate-300 whitespace-pre-wrap">{`npm install
 cp .env.example .env
 npm run dev`}</pre>
                 </div>
@@ -125,7 +145,7 @@ npm run dev`}</pre>
                 <h4 className="font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">Required Environment Variables (.env)</h4>
                 <div className="p-3 bg-slate-900 text-emerald-400 font-mono text-[11px] rounded-lg">
                   PORT=3000<br />
-                  NODE_ENV=development<br />
+                  NODE_ENV=production<br />
                   GEMINI_API_KEY=your_gemini_api_key_here
                 </div>
                 <p className="text-[11px] text-slate-500">
@@ -139,20 +159,23 @@ npm run dev`}</pre>
           {activeSubTab === 'deployment' && (
             <div className="space-y-6 text-xs text-slate-700 dark:text-slate-300">
               <div className="p-4 bg-blue-50 dark:bg-slate-800/80 rounded-xl border border-blue-200 dark:border-slate-700">
-                <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-1">🐳 Production Self-Hosting Blueprint</h3>
+                <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-1">🐳 Production Self-Hosting & Docker Compose</h3>
                 <p className="text-slate-600 dark:text-slate-300">
-                  Deploy to any cloud server (DigitalOcean, AWS, GCP, Hetzner, Linode) using Docker Compose or PM2 process manager with Nginx reverse proxy.
+                  Deploy to any cloud server or local laptop using Docker Compose. The image includes multi-stage compilation and a non-root <code>node</code> user.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-[11px]">
                 <div className="p-4 bg-slate-900 text-slate-200 rounded-xl border border-slate-800 space-y-2">
-                  <span className="text-emerald-400 font-bold block text-xs">🐳 Docker Compose Command</span>
+                  <span className="text-emerald-400 font-bold block text-xs">🐳 Docker Compose Commands</span>
                   <pre className="text-slate-300 whitespace-pre-wrap">{`# Launch container stack
-docker-compose up -d --build
+docker compose up -d --build
 
 # Inspect logs
-docker-compose logs -f soccermatrix`}</pre>
+docker compose logs -f soccermatrix
+
+# Stop container
+docker compose down`}</pre>
                 </div>
 
                 <div className="p-4 bg-slate-900 text-slate-200 rounded-xl border border-slate-800 space-y-2">
